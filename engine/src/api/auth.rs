@@ -1,5 +1,5 @@
-use actix_web::{error::ErrorUnauthorized, http::StatusCode, web, Error, Responder};
-use argon2::{password_hash::PasswordHash, Argon2, PasswordVerifier};
+use actix_web::{Error, error::ErrorUnauthorized, http::StatusCode, web};
+use argon2::{Argon2, PasswordVerifier, password_hash::PasswordHash};
 use chrono::{TimeDelta, Utc};
 use jsonwebtoken::{self, DecodingKey, EncodingKey, Header, Validation};
 use log::*;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite};
 
 use crate::{
-    db::{handles, models::Role, models::User, GLOBAL_SETTINGS},
+    db::{GLOBAL_SETTINGS, handles, models::Role, models::User},
     utils::errors::ServiceError,
 };
 
@@ -70,12 +70,21 @@ pub async fn decode_jwt(token: &str) -> Result<Claims, Error> {
 pub async fn authorize(
     pool: &Pool<Sqlite>,
     credentials: Credentials,
-) -> Result<impl Responder, ServiceError> {
+) -> Result<(serde_json::Value, StatusCode), ServiceError> {
     let username = credentials.username.clone();
     let password = credentials.password.clone();
 
     match handles::select_login(pool, &username).await {
         Ok(mut user) => {
+            if user.username.is_empty() {
+                return Ok((
+                    serde_json::json!({
+                        "detail": "Incorrect credentials!",
+                    }),
+                    StatusCode::FORBIDDEN,
+                ));
+            }
+
             let role = handles::select_role(pool, &user.role_id.unwrap_or_default()).await?;
 
             let pass_hash = user.password.clone();
@@ -97,30 +106,33 @@ pub async fn authorize(
 
                 info!("user {} login, with role: {role}", username);
 
-                Ok(web::Json(serde_json::json!({
-                    "access": access_token,
-                    "refresh": refresh_token,
-                }))
-                .customize()
-                .with_status(StatusCode::OK))
+                Ok((
+                    serde_json::json!({
+                        "access": access_token,
+                        "refresh": refresh_token,
+                    }),
+                    StatusCode::OK,
+                ))
             } else {
                 error!("Wrong password for {username}!");
 
-                Ok(web::Json(serde_json::json!({
-                    "detail": "Incorrect credentials!",
-                }))
-                .customize()
-                .with_status(StatusCode::FORBIDDEN))
+                Ok((
+                    serde_json::json!({
+                        "detail": "Incorrect credentials!",
+                    }),
+                    StatusCode::FORBIDDEN,
+                ))
             }
         }
         Err(e) => {
             error!("Login {username} failed! {e}");
 
-            Ok(web::Json(serde_json::json!({
-                "detail": format!("Login {username} failed!"),
-            }))
-            .customize()
-            .with_status(StatusCode::BAD_REQUEST))
+            Ok((
+                serde_json::json!({
+                    "detail": format!("Login {username} failed!"),
+                }),
+                StatusCode::BAD_REQUEST,
+            ))
         }
     }
 }
@@ -128,7 +140,7 @@ pub async fn authorize(
 pub async fn refresh(
     pool: &Pool<Sqlite>,
     data: TokenRefreshRequest,
-) -> Result<impl Responder, ServiceError> {
+) -> Result<(serde_json::Value, StatusCode), ServiceError> {
     let refresh_token = &data.refresh;
 
     match decode_jwt(refresh_token).await {
@@ -142,23 +154,26 @@ pub async fn refresh(
 
                 info!("user {} refresh, with role: {role}", user.username);
 
-                Ok(web::Json(serde_json::json!({
-                    "access": access_token
-                }))
-                .customize()
-                .with_status(StatusCode::OK))
+                Ok((
+                    serde_json::json!({
+                        "access": access_token
+                    }),
+                    StatusCode::OK,
+                ))
             } else {
-                Ok(web::Json(serde_json::json!({
-                    "detail": "Invalid user in refresh token",
-                }))
-                .customize()
-                .with_status(StatusCode::UNAUTHORIZED))
+                Ok((
+                    serde_json::json!({
+                        "detail": "Invalid user in refresh token",
+                    }),
+                    StatusCode::UNAUTHORIZED,
+                ))
             }
         }
-        Err(_) => Ok(web::Json(serde_json::json!({
-            "detail": "Invalid refresh token",
-        }))
-        .customize()
-        .with_status(StatusCode::BAD_REQUEST)),
+        Err(_) => Ok((
+            serde_json::json!({
+                "detail": "Invalid refresh token",
+            }),
+            StatusCode::BAD_REQUEST,
+        )),
     }
 }

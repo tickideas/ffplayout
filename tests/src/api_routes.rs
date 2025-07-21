@@ -1,7 +1,7 @@
-use actix_web::{get, web, App, Error, HttpResponse, Responder};
+use actix_web::{App, Error, HttpResponse, Responder, get, web};
 
 use serde_json::json;
-use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+use sqlx::{Pool, Sqlite, sqlite::SqlitePoolOptions};
 
 use ffplayout::api::routes::login;
 use ffplayout::db::{handles, init_globales, models::User};
@@ -89,5 +89,5 @@ async fn test_login() {
 
     let res = srv.post("/auth/login/").send_json(&payload).await.unwrap();
 
-    assert_eq!(res.status().as_u16(), 400);
+    assert_eq!(res.status().as_u16(), 403);
 }

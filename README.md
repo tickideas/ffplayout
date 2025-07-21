@@ -53,7 +53,7 @@ Check the [releases](https://github.com/ffplayout/ffplayout/releases/latest) for
 - generate playlist based on [template](/docs/playlist_gen.md) (experimental *)
 - During playlist import, all video clips are validated and, if desired, checked to ensure that the audio track is not completely muted.
 - run multiple channels (experimental *)
-- vtt [subtitle](/docs/closed_captions.md) in HLS mode (experimental *)
+- WebVtt [subtitle](/docs/closed_captions.md) in HLS mode (experimental *)
 
 For preview stream, read: [/docs/preview_stream.md](/docs/preview_stream.md)
 
@@ -123,4 +123,4 @@ If you are in playlist mode and move backwards or forwards in time, the time shi
 
 ## Note
 This project includes the DejaVu font, which are licensed under the [Bitstream Vera Fonts License](/assets/FONT_LICENSE.txt).
-ve.com/ffplayout/backers.svg?width=800&button=true)](https://opencollective.com/ffplayout)
+
